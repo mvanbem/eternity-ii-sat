@@ -2,10 +2,33 @@ use std::io::{stdout, BufWriter};
 
 use anyhow::Result;
 use eternity_ii::sat::{Clauses, Literal};
-use eternity_ii::{Color, Edge, RotatedTile, Rotation, Tile, Variable};
+use eternity_ii::{hints, Color, Edge, RotatedTile, Rotation, Tile, Variable};
 
 fn main() -> Result<()> {
     let mut clauses = Clauses::default();
+
+    // Assign the tile placements known from published clues.
+    for (x, y, rotated_tile) in hints() {
+        clauses.push_unit(Literal::positive(Variable::for_tile_placement(
+            x,
+            y,
+            rotated_tile,
+        )));
+        if x < 15 {
+            clauses.push_unit(Literal::positive(Variable::for_right_edge_color(
+                x,
+                y,
+                rotated_tile.edge_color(Edge::RIGHT),
+            )));
+        }
+        if y < 15 {
+            clauses.push_unit(Literal::positive(Variable::for_bottom_edge_color(
+                x,
+                y,
+                rotated_tile.edge_color(Edge::BOTTOM),
+            )));
+        }
+    }
 
     // One rotated tile per cell.
     for y in 0..16 {

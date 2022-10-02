@@ -1,3 +1,4 @@
+use std::fmt::{self, Display, Formatter};
 use std::ops::{Add, Sub};
 
 pub mod sat;
@@ -44,6 +45,22 @@ impl Rotation {
     pub const VALUES: [Rotation; 4] = [Rotation(0), Rotation(1), Rotation(2), Rotation(3)];
 }
 
+impl Display for Rotation {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self.0 {
+                0 => "upright",
+                1 => "rotated right",
+                2 => "upside down",
+                3 => "rotated left",
+                _ => unreachable!(),
+            },
+        )
+    }
+}
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Color(u8);
 
@@ -65,6 +82,12 @@ impl Color {
     pub fn from_index(index: usize) -> Color {
         let c = b'a' + index as u8;
         debug_assert!(c <= b'w');
+        Color(c)
+    }
+
+    pub fn from_char(c: char) -> Color {
+        let c = u8::try_from(c).unwrap();
+        debug_assert!(c >= b'a' && c <= b'w');
         Color(c)
     }
 }
@@ -92,6 +115,10 @@ impl Tile {
 
     pub fn index(self) -> usize {
         self.0 as usize
+    }
+
+    pub fn from_index(index: u8) -> Self {
+        Self(index)
     }
 }
 
@@ -195,9 +222,9 @@ impl From<usize> for Variable {
     }
 }
 
-impl Into<usize> for Variable {
-    fn into(self) -> usize {
-        self.0
+impl From<Variable> for usize {
+    fn from(variable: Variable) -> usize {
+        variable.0
     }
 }
 
@@ -218,6 +245,52 @@ pub enum VariableKind {
         y: usize,
         color: Color,
     },
+}
+
+pub fn hints() -> impl Iterator<Item = (usize, usize, RotatedTile)> {
+    [
+        (
+            7,
+            8,
+            RotatedTile {
+                tile: Tile(135),
+                rotation: Rotation(0),
+            },
+        ),
+        (
+            2,
+            2,
+            RotatedTile {
+                tile: Tile(76),
+                rotation: Rotation(0),
+            },
+        ),
+        (
+            13,
+            2,
+            RotatedTile {
+                tile: Tile(179),
+                rotation: Rotation(3),
+            },
+        ),
+        (
+            2,
+            13,
+            RotatedTile {
+                tile: Tile(211),
+                rotation: Rotation(2),
+            },
+        ),
+        (
+            13,
+            13,
+            RotatedTile {
+                tile: Tile(125),
+                rotation: Rotation(1),
+            },
+        ),
+    ]
+    .into_iter()
 }
 
 #[cfg(test)]
