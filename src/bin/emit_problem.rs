@@ -1,9 +1,12 @@
 use std::io::{stdout, BufWriter};
 
 use anyhow::Result;
-use eternity_ii::sat::{Clauses, Literal};
-use eternity_ii::{hints, Color, Edge, RotatedTile, Rotation, Tile, Variable};
+use bitint::prelude::*;
+use eternity_ii::sat::{Clauses, Literal, Variable};
+use eternity_ii::{hints, Color, RotatedTile, Rotation, Side, Tile};
+use strum::IntoEnumIterator;
 
+#[bitint_literals]
 fn main() -> Result<()> {
     let mut clauses = Clauses::default();
 
@@ -14,18 +17,18 @@ fn main() -> Result<()> {
             y,
             rotated_tile,
         )));
-        if x < 15 {
+        if x < 15_U4 {
             clauses.push_unit(Literal::positive(Variable::for_right_edge_color(
                 x,
                 y,
-                rotated_tile.edge_color(Edge::RIGHT),
+                rotated_tile.color(Side::Right),
             )));
         }
-        if y < 15 {
+        if y < 15_U4 {
             clauses.push_unit(Literal::positive(Variable::for_bottom_edge_color(
                 x,
                 y,
-                rotated_tile.edge_color(Edge::BOTTOM),
+                rotated_tile.color(Side::Bottom),
             )));
         }
     }
@@ -35,10 +38,10 @@ fn main() -> Result<()> {
         for x in 0..16 {
             let mut variables = Vec::new();
             for tile in Tile::values() {
-                for rotation in Rotation::VALUES {
+                for rotation in Rotation::iter() {
                     variables.push(Variable::for_tile_placement(
-                        x,
-                        y,
+                        U4::new_masked(x),
+                        U4::new_masked(y),
                         RotatedTile { tile, rotation },
                     ));
                 }
@@ -53,10 +56,10 @@ fn main() -> Result<()> {
         let mut variables = Vec::new();
         for y in 0..16 {
             for x in 0..16 {
-                for rotation in Rotation::VALUES {
+                for rotation in Rotation::iter() {
                     variables.push(Variable::for_tile_placement(
-                        x,
-                        y,
+                        U4::new_masked(x),
+                        U4::new_masked(y),
                         RotatedTile { tile, rotation },
                     ));
                 }
@@ -69,21 +72,23 @@ fn main() -> Result<()> {
 
     // Imply right edge colors for tile placements.
     for y in 0..16 {
+        let y = U4::new_masked(y);
         for x in 0..15 {
+            let x = U4::new_masked(x);
             for tile in Tile::values() {
-                for rotation in Rotation::VALUES {
+                for rotation in Rotation::iter() {
                     let rotated_tile = RotatedTile { tile, rotation };
 
                     // Right edge of the tile at (x, y).
-                    let color = rotated_tile.edge_color(Edge::RIGHT);
-                    if color != Color::GRAY {
+                    let color = rotated_tile.color(Side::Right);
+                    if color.is_valid_non_border_color() {
                         // placed(x, y, rotated_tile) -> right_edge_color(x, y, color)
                         clauses.push_binary(
                             Literal::negative(Variable::for_tile_placement(x, y, rotated_tile)),
                             Literal::positive(Variable::for_right_edge_color(x, y, color)),
                         );
-                        for other_color in Color::values() {
-                            if other_color != Color::GRAY && other_color != color {
+                        for other_color in Color::iter() {
+                            if other_color.is_valid_non_border_color() && other_color != color {
                                 // placed(x, y, rotated_tile) -> -right_edge_color(x, y, other_color)
                                 clauses.push_binary(
                                     Literal::negative(Variable::for_tile_placement(
@@ -110,19 +115,23 @@ fn main() -> Result<()> {
                     }
 
                     // Left edge of the tile at (x+1, y).
-                    let color = rotated_tile.edge_color(Edge::LEFT);
-                    if color != Color::GRAY {
+                    let color = rotated_tile.color(Side::Left);
+                    if color.is_valid_non_border_color() {
                         // placed(x+1, y, rotated_tile) -> right_edge_color(x, y, color)
                         clauses.push_binary(
-                            Literal::negative(Variable::for_tile_placement(x + 1, y, rotated_tile)),
+                            Literal::negative(Variable::for_tile_placement(
+                                x + 1_U4,
+                                y,
+                                rotated_tile,
+                            )),
                             Literal::positive(Variable::for_right_edge_color(x, y, color)),
                         );
-                        for other_color in Color::values() {
-                            if other_color != Color::GRAY && other_color != color {
+                        for other_color in Color::iter() {
+                            if other_color.is_valid_non_border_color() && other_color != color {
                                 // placed(x+1, y, rotated_tile) -> -right_edge_color(x, y, other_color)
                                 clauses.push_binary(
                                     Literal::negative(Variable::for_tile_placement(
-                                        x + 1,
+                                        x + 1_U4,
                                         y,
                                         rotated_tile,
                                     )),
@@ -138,7 +147,7 @@ fn main() -> Result<()> {
                         // Can't place a gray edge in the middle of the board.
                         // -placed(x+1, y, rotated_tile)
                         clauses.push_unit(Literal::negative(Variable::for_tile_placement(
-                            x + 1,
+                            x + 1_U4,
                             y,
                             rotated_tile,
                         )));
@@ -150,21 +159,23 @@ fn main() -> Result<()> {
 
     // Imply bottom edge colors for tile placements.
     for y in 0..15 {
+        let y = U4::new_masked(y);
         for x in 0..16 {
+            let x = U4::new_masked(x);
             for tile in Tile::values() {
-                for rotation in Rotation::VALUES {
+                for rotation in Rotation::iter() {
                     let rotated_tile = RotatedTile { tile, rotation };
 
                     // Bottom edge of the tile at (x, y).
-                    let color = rotated_tile.edge_color(Edge::BOTTOM);
-                    if color != Color::GRAY {
+                    let color = rotated_tile.color(Side::Bottom);
+                    if color != Color::EXTERIOR {
                         // placed(x, y, rotated_tile) -> bottom_edge_color(x, y, color)
                         clauses.push_binary(
                             Literal::negative(Variable::for_tile_placement(x, y, rotated_tile)),
                             Literal::positive(Variable::for_bottom_edge_color(x, y, color)),
                         );
-                        for other_color in Color::values() {
-                            if other_color != Color::GRAY && other_color != color {
+                        for other_color in Color::iter() {
+                            if other_color != Color::EXTERIOR && other_color != color {
                                 // placed(x, y, rotated_tile) -> -bottom_edge_color(x, y, other_color)
                                 clauses.push_binary(
                                     Literal::negative(Variable::for_tile_placement(
@@ -191,20 +202,24 @@ fn main() -> Result<()> {
                     }
 
                     // Top edge of the tile at (x, y+1).
-                    let color = rotated_tile.edge_color(Edge::TOP);
-                    if color != Color::GRAY {
+                    let color = rotated_tile.color(Side::Top);
+                    if color != Color::EXTERIOR {
                         // placed(x, y+1, rotated_tile) -> bottom_edge_color(x, y, color)
                         clauses.push_binary(
-                            Literal::negative(Variable::for_tile_placement(x, y + 1, rotated_tile)),
+                            Literal::negative(Variable::for_tile_placement(
+                                x,
+                                y + 1_U4,
+                                rotated_tile,
+                            )),
                             Literal::positive(Variable::for_bottom_edge_color(x, y, color)),
                         );
-                        for other_color in Color::values() {
-                            if other_color != Color::GRAY && other_color != color {
+                        for other_color in Color::iter() {
+                            if other_color != Color::EXTERIOR && other_color != color {
                                 // placed(x, y+1, rotated_tile) -> -bottom_edge_color(x, y, other_color)
                                 clauses.push_binary(
                                     Literal::negative(Variable::for_tile_placement(
                                         x,
-                                        y + 1,
+                                        y + 1_U4,
                                         rotated_tile,
                                     )),
                                     Literal::negative(Variable::for_bottom_edge_color(
@@ -220,7 +235,7 @@ fn main() -> Result<()> {
                         // -placed(x, y+1, rotated_tile)
                         clauses.push_unit(Literal::negative(Variable::for_tile_placement(
                             x,
-                            y + 1,
+                            y + 1_U4,
                             rotated_tile,
                         )));
                     }
@@ -231,20 +246,21 @@ fn main() -> Result<()> {
 
     // Rule out top and bottom edges on the perimeter that aren't gray.
     for x in 0..16 {
+        let x = U4::new_masked(x);
         for tile in Tile::values() {
-            for rotation in Rotation::VALUES {
+            for rotation in Rotation::iter() {
                 let rotated_tile = RotatedTile { tile, rotation };
-                if rotated_tile.edge_color(Edge::TOP) != Color::GRAY {
+                if rotated_tile.color(Side::Top) != Color::EXTERIOR {
                     clauses.push_unit(Literal::negative(Variable::for_tile_placement(
                         x,
-                        0,
+                        0_U4,
                         rotated_tile,
                     )));
                 }
-                if rotated_tile.edge_color(Edge::BOTTOM) != Color::GRAY {
+                if rotated_tile.color(Side::Bottom) != Color::EXTERIOR {
                     clauses.push_unit(Literal::negative(Variable::for_tile_placement(
                         x,
-                        15,
+                        15_U4,
                         rotated_tile,
                     )));
                 }
@@ -254,19 +270,20 @@ fn main() -> Result<()> {
 
     // Rule out left and right edges on the perimeter that aren't gray.
     for y in 0..16 {
+        let y = U4::new_masked(y);
         for tile in Tile::values() {
-            for rotation in Rotation::VALUES {
+            for rotation in Rotation::iter() {
                 let rotated_tile = RotatedTile { tile, rotation };
-                if rotated_tile.edge_color(Edge::LEFT) != Color::GRAY {
+                if rotated_tile.color(Side::Left) != Color::EXTERIOR {
                     clauses.push_unit(Literal::negative(Variable::for_tile_placement(
-                        0,
+                        0_U4,
                         y,
                         rotated_tile,
                     )));
                 }
-                if rotated_tile.edge_color(Edge::RIGHT) != Color::GRAY {
+                if rotated_tile.color(Side::Right) != Color::EXTERIOR {
                     clauses.push_unit(Literal::negative(Variable::for_tile_placement(
-                        15,
+                        15_U4,
                         y,
                         rotated_tile,
                     )));

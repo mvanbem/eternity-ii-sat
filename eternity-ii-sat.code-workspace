@@ -1,8 +1,15 @@
 {
 	"folders": [
 		{
-			"path": "."
-		}
+			"path": ".",
+		},
 	],
-	"settings": {}
+	"settings": {
+		"files.exclude": {
+			"target": true,
+		},
+		"files.watcherExclude": {
+			"target": true,
+		},
+	},
 }

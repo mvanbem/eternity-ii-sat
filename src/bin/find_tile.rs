@@ -1,19 +1,21 @@
-use eternity_ii::{Color, Edge, RotatedTile, Rotation, Tile};
+use eternity_ii::{Color, RotatedTile, Rotation, Side, Tile};
+use strum::IntoEnumIterator;
 
 fn main() {
     let goal = std::env::args().skip(1).next().unwrap();
-    println!("Searching for a tile with edge assignment {goal:?}");
+    println!("Searching for a tile with edge assignment {goal:?} (right, up, left, down)");
 
     for tile in Tile::values() {
-        for rotation in Rotation::VALUES {
-            let rotated = RotatedTile { tile, rotation };
+        for rotation in Rotation::iter() {
+            let oriented = RotatedTile { tile, rotation };
             if goal
                 .chars()
                 .map(Color::from_char)
-                .zip(Edge::VALUES)
-                .all(|(color, edge)| rotated.edge_color(edge) == color)
+                .map(Option::unwrap)
+                .zip(Side::iter())
+                .all(|(color, side)| oriented.color(side) == color)
             {
-                println!("Matched tile {} {}", tile.index(), rotation);
+                println!("Matched tile {} {:?}", tile.to_primitive(), rotation);
                 return;
             }
         }

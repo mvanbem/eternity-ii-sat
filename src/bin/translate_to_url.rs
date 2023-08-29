@@ -1,7 +1,10 @@
 use std::io::{stdin, BufRead, BufReader};
 
 use anyhow::Result;
-use eternity_ii::{Edge, Variable, VariableKind};
+use bitint::prelude::*;
+use eternity_ii::sat::{Variable, VariableKind};
+use eternity_ii::Side;
+use strum::IntoEnumIterator;
 
 use crate::validation::Validation;
 
@@ -48,6 +51,7 @@ macro_rules! log_warning {
     };
 }
 
+#[bitint_literals]
 fn main() -> Result<()> {
     let mut literals = Vec::new();
     'outer: for line in BufReader::new(stdin()).lines() {
@@ -75,29 +79,28 @@ fn main() -> Result<()> {
         if literal > 0 {
             match Variable::from(literal.abs() as usize).kind() {
                 VariableKind::TilePlacement { x, y, rotated_tile } => {
-                    if used_tiles[rotated_tile.tile.index()] {
-                        log_error!(v, "Tile {} used more than once", rotated_tile.tile.index());
+                    if used_tiles[rotated_tile.tile.to_primitive() as usize] {
+                        log_error!(v, "Tile {:?} used more than once", rotated_tile.tile);
                     }
-                    used_tiles[rotated_tile.tile.index()] = true;
-                    for edge in Edge::VALUES {
-                        board_edges[64 * y + 4 * x + edge.index()] =
-                            rotated_tile.edge_color(edge).as_u8();
+                    used_tiles[rotated_tile.tile.to_primitive() as usize] = true;
+                    for side in Side::iter() {
+                        board_edges[index(x, y, side)] = rotated_tile.color(side).to_byte_char();
                     }
                 }
                 VariableKind::RightEdgeColor { x, y, color } => {
-                    if board_edges[64 * y + 4 * x + Edge::RIGHT.index()] != color.as_u8() {
+                    if board_edges[index(x, y, Side::Right)] != color.to_byte_char() {
                         log_warning!(v, "Conflict at ({}, {}) right edge", x, y);
                     }
-                    if board_edges[64 * y + 4 * (x + 1) + Edge::LEFT.index()] != color.as_u8() {
-                        log_warning!(v, "Conflict at ({}, {}) left edge", x + 1, y);
+                    if board_edges[index(x + 1_U4, y, Side::Left)] != color.to_byte_char() {
+                        log_warning!(v, "Conflict at ({}, {}) left edge", x + 1_U4, y);
                     }
                 }
                 VariableKind::BottomEdgeColor { x, y, color } => {
-                    if board_edges[64 * y + 4 * x + Edge::BOTTOM.index()] != color.as_u8() {
+                    if board_edges[index(x, y, Side::Bottom)] != color.to_byte_char() {
                         log_warning!(v, "Conflict at ({}, {}) bottom edge", x, y);
                     }
-                    if board_edges[64 * (y + 1) + 4 * x + Edge::TOP.index()] != color.as_u8() {
-                        log_warning!(v, "Conflict at ({}, {}) top edge", x, y + 1);
+                    if board_edges[index(x, y + 1_U4, Side::Top)] != color.to_byte_char() {
+                        log_warning!(v, "Conflict at ({}, {}) top edge", x, y + 1_U4);
                     }
                 }
             }
@@ -116,4 +119,15 @@ fn main() -> Result<()> {
     );
 
     v.finish()
+}
+
+fn index(x: U4, y: U4, side: Side) -> usize {
+    64 * y.to_primitive() as usize
+        + 4 * x.to_primitive() as usize
+        + match side {
+            Side::Top => 0,
+            Side::Right => 1,
+            Side::Bottom => 2,
+            Side::Left => 3,
+        }
 }

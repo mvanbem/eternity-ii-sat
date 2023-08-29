@@ -2,8 +2,13 @@
 name = "eternity-ii"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT"
 
 [dependencies]
 anyhow = "1"
+bitint = "0.1"
+bitvec = "1"
+mvbitfield = "0.2"
+num-format = { version = "0.4", features = ["with-system-locale"] }
+rayon = "1"
+strum = { version = "0.25", features = ["derive"] }
